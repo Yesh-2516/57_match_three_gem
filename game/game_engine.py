@@ -10,11 +10,19 @@ class GameEngine:
         offset_y = (height - (GRID_SIZE * TILE_SIZE)) // 2 + 30
 
         self.board = Board(offset_x, offset_y, target_score=500, max_moves=20)
+        
+        self.idle_since = pygame.time.get_ticks()
+        self.hint_swap = None
 
         self.font_big = pygame.font.SysFont(None, 48)
         self.font_small = pygame.font.SysFont(None, 24)
 
+    
     def handle_click(self, mouse_pos):
+        self.idle_since = pygame.time.get_ticks()
+        self.hint_swap = None
+        self.board.hint_swap = None
+
         if self.board.is_game_over() or self.board.is_animating():
             return
 
@@ -38,9 +46,22 @@ class GameEngine:
 
     def reset(self):
         self.board.reset()
+        self.idle_since = pygame.time.get_ticks()
+        self.hint_swap = None
+        self.board.hint_swap = None
 
     def update(self):
         self.board.update()
+
+        if self.board.is_game_over() or self.board.is_animating():
+            self.hint_swap = None
+            self.board.hint_swap = None
+            return
+
+        if pygame.time.get_ticks() - self.idle_since > 5000:
+            if self.hint_swap is None:
+                self.hint_swap = self.board.find_valid_swap()
+                self.board.hint_swap = self.hint_swap
 
     def render(self, screen):
         screen.fill((32, 34, 40))
@@ -55,6 +76,21 @@ class GameEngine:
         screen.blit(hud_surf, (self.width // 2 - hud_surf.get_width() // 2, 55))
 
         self.board.render(screen)
+        
+        if (
+            self.board.combo_display is not None
+            and pygame.time.get_ticks() < self.board.combo_display_until
+        ):
+            combo_surf = self.font_big.render(
+                f"COMBO x{self.board.combo_display}", True, (255, 220, 80)
+            )
+            screen.blit(
+                combo_surf,
+                (
+                    self.width // 2 - combo_surf.get_width() // 2,
+                    self.board.offset_y - 30,
+                ),
+            )
 
         inst_surf = self.font_small.render(
             "Swap gems to match 3+. Press [R] to Restart.",
